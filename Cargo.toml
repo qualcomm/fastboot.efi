@@ -1,0 +1,17 @@
+[package]
+name = "fastboot"
+version = "0.1.0"
+edition = "2021"
+publish = false
+
+[dependencies]
+ffi = "0.1.1"
+log = "0.4"
+uefi = { version = "0.34.1", features = ["alloc", "global_allocator", "logger", "panic_handler"] }
+uefi-raw = "0.10.0"
+uguid = "2.2.0"
+
+[patch.crates-io]
+uefi = { git = "https://github.com/rust-osdev/uefi-rs.git" }
+uefi-macros = { git = "https://github.com/rust-osdev/uefi-rs.git" }
+uefi-raw = { git = "https://github.com/rust-osdev/uefi-rs.git" }
