@@ -276,11 +276,13 @@ pub(crate) struct EfiUsbDeviceProtocol {
         size: *mut u64,
         data: *mut UsbDeviceEventData,
     ) -> Status,
-    pub(crate) allocate_transfer_buffer: unsafe extern "efiapi" fn(size: u64, ptr: *mut *mut u8) -> Status,
+    pub(crate) allocate_transfer_buffer:
+        unsafe extern "efiapi" fn(size: u64, ptr: *mut *mut u8) -> Status,
     pub(crate) free_transfer_buffer: unsafe extern "efiapi" fn(ptr: *mut u8) -> Status,
     pub(crate) stop: unsafe extern "efiapi" fn() -> Status,
     pub(crate) abort_xfer: unsafe extern "efiapi" fn() -> Status,
-    pub(crate) set_endpoint_stall_state: unsafe extern "efiapi" fn(ep_idx: u8, state: bool) -> Status,
+    pub(crate) set_endpoint_stall_state:
+        unsafe extern "efiapi" fn(ep_idx: u8, state: bool) -> Status,
     pub(crate) start_ex: unsafe extern "efiapi" fn(desc: *const UsbDeviceDescriptorSet) -> Status,
 }
 

@@ -334,9 +334,7 @@ impl EfiUsbDevice {
                 let state = unsafe { event_data.state };
                 match state {
                     UsbDeviceState::Connected => Ok(EfiUsbDeviceEvent::Connected),
-                    UsbDeviceState::Disconnected => {
-                        Ok(EfiUsbDeviceEvent::Disconnected)
-                    }
+                    UsbDeviceState::Disconnected => Ok(EfiUsbDeviceEvent::Disconnected),
                 }
             }
             UsbDeviceEvent::TransferNotification => {
@@ -356,10 +354,9 @@ impl EfiUsbDevice {
                     (ENDPOINT_OUT, UsbDeviceTransferStatus::Cancelled) => {
                         Ok(EfiUsbDeviceEvent::NoEvent)
                     }
-                    (
-                        ENDPOINT_OUT,
-                        UsbDeviceTransferStatus::CompleteError,
-                    ) => Ok(EfiUsbDeviceEvent::NoEvent),
+                    (ENDPOINT_OUT, UsbDeviceTransferStatus::CompleteError) => {
+                        Ok(EfiUsbDeviceEvent::NoEvent)
+                    }
                     (ENDPOINT_IN, UsbDeviceTransferStatus::Active) => {
                         Ok(EfiUsbDeviceEvent::NoEvent)
                     }
@@ -369,10 +366,9 @@ impl EfiUsbDevice {
                     (ENDPOINT_IN, UsbDeviceTransferStatus::Cancelled) => {
                         Ok(EfiUsbDeviceEvent::NoEvent)
                     }
-                    (
-                        ENDPOINT_IN,
-                        UsbDeviceTransferStatus::CompleteError,
-                    ) => Ok(EfiUsbDeviceEvent::NoEvent),
+                    (ENDPOINT_IN, UsbDeviceTransferStatus::CompleteError) => {
+                        Ok(EfiUsbDeviceEvent::NoEvent)
+                    }
                     _ => Ok(EfiUsbDeviceEvent::NoEvent),
                 }
             }
