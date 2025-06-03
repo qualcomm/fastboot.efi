@@ -29,11 +29,19 @@ In general, contributors should develop on branches based off of `main` and pull
     git remote add upstream https://github.com/qualcomm/fastboot.efi.git
     ```
 
-1. Make your changes, add tests, and make sure the tests still pass.
-1. Commit your changes using the [DCO](http://developercertificate.org/). You can attest to the DCO by commiting with the **-s** or **--signoff** options or manually adding the "Signed-off-by":
+1. Make and validate your changes.
+
+1. Check for and address formatting and clippy issues
 
     ```bash
-    git commit -s -m "Really useful commit message"`
+    cargo fmt --all -- --check --verbose
+    cargo clippy --target aarch64-unknown-uefi -- -D warnings --verbose
+    ```
+
+1. Commit your changes using the [DCO](http://developercertificate.org/). Provide a good commit message, that describes the problem you're solving followed by any technical description of the change. You can attest to the DCO by commiting with the **-s** or **--signoff** options or manually adding the "Signed-off-by":
+
+    ```bash
+    git commit -s
     ```
 
 1. After committing your changes on the topic branch, sync it with the upstream branch:
