@@ -165,28 +165,28 @@ pub(crate) const USB_DEVICE_CAPABLITY_SUPER_SPEED_PLUS_DESCRIPTOR_CAPABILITY_TYP
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub(crate) enum UsbDeviceEvent {
-    UsbDeviceEventNoEvent,
-    UsbDeviceEventDeviceStateChange,
-    UsbDeviceEventTransferNotification,
-    UsbDeviceEventOemEvent,
+    NoEvent,
+    DeviceStateChange,
+    TransferNotification,
+    OemEvent,
 }
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub(crate) enum UsbDeviceState {
-    UsbDeviceStateConnected,
-    UsbDeviceStateDisconnected,
+    Connected,
+    Disconnected,
 }
 
 #[allow(dead_code)]
 #[derive(Clone, Copy, Debug)]
 #[repr(C)]
 pub(crate) enum UsbDeviceTransferStatus {
-    UsbDeviceTransferStatusActive,
-    UsbDeviceTransferStatusCompleteOK,
-    UsbDeviceTransferStatusCancelled,
-    UsbDeviceTransferStatusCompleteError,
+    Active,
+    CompleteOK,
+    Cancelled,
+    CompleteError,
 }
 
 #[derive(Clone, Copy, Debug)]

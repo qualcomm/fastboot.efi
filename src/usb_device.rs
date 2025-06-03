@@ -319,33 +319,33 @@ impl EfiUsbDevice {
     }
 
     pub fn handle_event(&self) -> Result<EfiUsbDeviceEvent> {
-        let mut event: UsbDeviceEvent = UsbDeviceEvent::UsbDeviceEventNoEvent;
+        let mut event: UsbDeviceEvent = UsbDeviceEvent::NoEvent;
         let mut event_size: u64 = 0;
         let mut event_data: UsbDeviceEventData = UsbDeviceEventData {
-            state: UsbDeviceState::UsbDeviceStateDisconnected,
+            state: UsbDeviceState::Disconnected,
         };
 
         unsafe { (self.0.handle_event)(&mut event, &mut event_size, &mut event_data) }
             .to_result()?;
 
         match event {
-            UsbDeviceEvent::UsbDeviceEventNoEvent => Ok(EfiUsbDeviceEvent::NoEvent),
-            UsbDeviceEvent::UsbDeviceEventDeviceStateChange => {
+            UsbDeviceEvent::NoEvent => Ok(EfiUsbDeviceEvent::NoEvent),
+            UsbDeviceEvent::DeviceStateChange => {
                 let state = unsafe { event_data.state };
                 match state {
-                    UsbDeviceState::UsbDeviceStateConnected => Ok(EfiUsbDeviceEvent::Connected),
-                    UsbDeviceState::UsbDeviceStateDisconnected => {
+                    UsbDeviceState::Connected => Ok(EfiUsbDeviceEvent::Connected),
+                    UsbDeviceState::Disconnected => {
                         Ok(EfiUsbDeviceEvent::Disconnected)
                     }
                 }
             }
-            UsbDeviceEvent::UsbDeviceEventTransferNotification => {
+            UsbDeviceEvent::TransferNotification => {
                 let transfer_outcome = unsafe { event_data.transfer_outcome };
                 match (transfer_outcome.endpoint_index, transfer_outcome.status) {
-                    (ENDPOINT_OUT, UsbDeviceTransferStatus::UsbDeviceTransferStatusActive) => {
+                    (ENDPOINT_OUT, UsbDeviceTransferStatus::Active) => {
                         Ok(EfiUsbDeviceEvent::NoEvent)
                     }
-                    (ENDPOINT_OUT, UsbDeviceTransferStatus::UsbDeviceTransferStatusCompleteOK) => {
+                    (ENDPOINT_OUT, UsbDeviceTransferStatus::CompleteOK) => {
                         let data = slice_from_raw_parts(
                             transfer_outcome.data,
                             transfer_outcome.bytes_completed as usize,
@@ -353,30 +353,30 @@ impl EfiUsbDevice {
                         let test = unsafe { data.as_ref() }.unwrap();
                         Ok(EfiUsbDeviceEvent::OutData(test))
                     }
-                    (ENDPOINT_OUT, UsbDeviceTransferStatus::UsbDeviceTransferStatusCancelled) => {
+                    (ENDPOINT_OUT, UsbDeviceTransferStatus::Cancelled) => {
                         Ok(EfiUsbDeviceEvent::NoEvent)
                     }
                     (
                         ENDPOINT_OUT,
-                        UsbDeviceTransferStatus::UsbDeviceTransferStatusCompleteError,
+                        UsbDeviceTransferStatus::CompleteError,
                     ) => Ok(EfiUsbDeviceEvent::NoEvent),
-                    (ENDPOINT_IN, UsbDeviceTransferStatus::UsbDeviceTransferStatusActive) => {
+                    (ENDPOINT_IN, UsbDeviceTransferStatus::Active) => {
                         Ok(EfiUsbDeviceEvent::NoEvent)
                     }
-                    (ENDPOINT_IN, UsbDeviceTransferStatus::UsbDeviceTransferStatusCompleteOK) => {
+                    (ENDPOINT_IN, UsbDeviceTransferStatus::CompleteOK) => {
                         Ok(EfiUsbDeviceEvent::NoEvent)
                     }
-                    (ENDPOINT_IN, UsbDeviceTransferStatus::UsbDeviceTransferStatusCancelled) => {
+                    (ENDPOINT_IN, UsbDeviceTransferStatus::Cancelled) => {
                         Ok(EfiUsbDeviceEvent::NoEvent)
                     }
                     (
                         ENDPOINT_IN,
-                        UsbDeviceTransferStatus::UsbDeviceTransferStatusCompleteError,
+                        UsbDeviceTransferStatus::CompleteError,
                     ) => Ok(EfiUsbDeviceEvent::NoEvent),
                     _ => Ok(EfiUsbDeviceEvent::NoEvent),
                 }
             }
-            UsbDeviceEvent::UsbDeviceEventOemEvent => Ok(EfiUsbDeviceEvent::NoEvent),
+            UsbDeviceEvent::OemEvent => Ok(EfiUsbDeviceEvent::NoEvent),
         }
     }
 
