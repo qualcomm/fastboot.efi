@@ -80,7 +80,7 @@ pub(crate) fn handle_bootimg(payload: &[u8]) -> Result<(Handle, Option<LinuxInit
         .position(|&b| b == 0)
         .unwrap_or(aboot2.cmdline.len());
     let cmdline = &aboot2.cmdline[..cmdline_len];
-    let cmdline = core::str::from_utf8(&cmdline).expect("Unable to parse command line");
+    let cmdline = core::str::from_utf8(cmdline).expect("Unable to parse command line");
 
     let mut cmdline_buf =
         boot::allocate_pool(MemoryType::BOOT_SERVICES_DATA, (cmdline.len() + 1) * 2)?.cast::<u16>();

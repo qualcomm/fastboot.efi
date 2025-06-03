@@ -96,7 +96,7 @@ fn handle_download(usb_device: &ScopedProtocol<EfiUsbDevice>, size: usize) -> Re
         .allocate_transfer_buffer(16 * 1024 * 1024)
         .expect("failed to allocate command buffer");
 
-    fastboot_respond(&usb_device, &format!("DATA{:08x}", size))?;
+    fastboot_respond(usb_device, &format!("DATA{:08x}", size))?;
 
     usb_device
         .send(
@@ -115,7 +115,7 @@ fn handle_download(usb_device: &ScopedProtocol<EfiUsbDevice>, size: usize) -> Re
             usb_device::EfiUsbDeviceEvent::Disconnected => break,
             usb_device::EfiUsbDeviceEvent::OutData(data) => {
                 let dest_slice = &mut target_slice[offset..offset + data.len()];
-                dest_slice.copy_from_slice(&data);
+                dest_slice.copy_from_slice(data);
 
                 download_remains -= data.len();
                 offset += data.len();
@@ -135,7 +135,7 @@ fn handle_download(usb_device: &ScopedProtocol<EfiUsbDevice>, size: usize) -> Re
     usb_device.free_transfer_buffer(receive_buffer)?;
 
     if offset == target_slice.len() {
-        fastboot_respond(&usb_device, &format!("OKAY"))?;
+        fastboot_respond(usb_device, "OKAY")?;
     }
 
     Ok(target_slice)
@@ -232,13 +232,13 @@ fn handle_boot(usb_device: &ScopedProtocol<EfiUsbDevice>, payload: &[u8]) -> Res
     } else if is_bootimg(payload) {
         handle_bootimg(payload)?
     } else {
-        fastboot_respond(&usb_device, "FAIL")?;
+        fastboot_respond(usb_device, "FAIL")?;
         return Err(uefi::Error::new(Status::INVALID_PARAMETER, ()));
     };
 
     create_empty_rt_properties_table()?.install_configuration_table(&EFI_RT_PROPERTIES_TABLE)?;
 
-    fastboot_respond(&usb_device, "OKAY")?;
+    fastboot_respond(usb_device, "OKAY")?;
     boot::start_image(handle)?;
 
     Ok(())
@@ -318,7 +318,7 @@ fn main() -> Status {
 
                     break 'message_loop;
                 } else {
-                    fastboot_respond(&usb_device, &format!("FAILunknown command"))
+                    fastboot_respond(&usb_device, "FAILunknown command")
                         .expect("Failed to send response");
                 }
 
