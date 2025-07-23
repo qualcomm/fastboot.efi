@@ -96,7 +96,7 @@ fn handle_download(usb_device: &ScopedProtocol<EfiUsbDevice>, size: usize) -> Re
         .allocate_transfer_buffer(16 * 1024 * 1024)
         .expect("failed to allocate command buffer");
 
-    fastboot_respond(usb_device, &format!("DATA{:08x}", size))?;
+    fastboot_respond(usb_device, &format!("DATA{size:08x}"))?;
 
     usb_device
         .send(
@@ -257,7 +257,7 @@ fn generate_serial_number() -> Result<CString16> {
     };
 
     let mut buf = [0; 9];
-    let serial = format!("{:08x}", serial);
+    let serial = format!("{serial:08x}");
     let serial = CStr16::from_str_with_buf(&serial, &mut buf).unwrap();
 
     Ok(serial.into())
