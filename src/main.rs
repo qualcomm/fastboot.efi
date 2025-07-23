@@ -318,7 +318,8 @@ fn main() -> Status {
     let version = env!("BUILD_VERSION");
     info!("fastboot.efi {}", version);
 
-    let serial_number = generate_serial_number().unwrap();
+    let serial_number =
+        generate_serial_number().unwrap_or(CString16::try_from("deadcafe").unwrap());
 
     signal_usb_controller_init().expect("failed to signal usb controller initialization");
 
