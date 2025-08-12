@@ -5,12 +5,15 @@ use core::ptr::slice_from_raw_parts_mut;
 use log::info;
 use uefi::boot::{self, MemoryType};
 use uefi::proto::loaded_image::LoadedImage;
-use uefi::{CStr16, Handle, Result};
+use uefi::{CStr16, Error, Handle, Result, Status};
 
 use crate::EFI_FDT_TABLE;
 
 use crate::initrd::LinuxInitrd;
 use crate::FastbootBuffer;
+use crate::UefiResultContext;
+
+use crate::peimage::is_peimage;
 
 const BOOT_MAGIC: &[u8; 8] = b"ANDROID!";
 
@@ -42,7 +45,9 @@ pub(crate) fn is_bootimg(payload: &[u8]) -> bool {
     payload.starts_with(BOOT_MAGIC)
 }
 
-pub(crate) fn handle_bootimg(payload: &[u8]) -> Result<(Handle, Option<LinuxInitrd>)> {
+pub(crate) fn handle_bootimg(
+    payload: &[u8],
+) -> Result<(Handle, Option<LinuxInitrd>), &'static str> {
     let aboot2: &AndroidBootImageV2 = unsafe { &*(payload.as_ptr().cast()) };
 
     let page_align = |offset: usize| {
@@ -65,14 +70,29 @@ pub(crate) fn handle_bootimg(payload: &[u8]) -> Result<(Handle, Option<LinuxInit
         kernel_size, kernel_offset, ramdisk_size, ramdisk_offset, dtb_size, dtb_offset
     );
 
-    let mut kernel = FastbootBuffer::alloc(MemoryType::RUNTIME_SERVICES_CODE, kernel_size)?;
-    kernel.write(&payload[kernel_offset..kernel_offset + kernel_size])?;
+    if !is_peimage(&payload[ramdisk_offset..ramdisk_offset + ramdisk_size]) {
+        return Err(Error::new(
+            Status::INVALID_PARAMETER,
+            "kernel payload is not an EFI application",
+        ));
+    }
 
-    let mut ramdisk = FastbootBuffer::alloc(MemoryType::BOOT_SERVICES_DATA, ramdisk_size)?;
-    ramdisk.write(&payload[ramdisk_offset..ramdisk_offset + ramdisk_size])?;
+    let mut kernel = FastbootBuffer::alloc(MemoryType::RUNTIME_SERVICES_CODE, kernel_size)
+        .with_context("failed to allocate memory for kernel")?;
+    kernel
+        .write(&payload[kernel_offset..kernel_offset + kernel_size])
+        .with_context("failed to write kernel payload")?;
 
-    let mut dtb = FastbootBuffer::alloc(MemoryType::ACPI_RECLAIM, dtb_size)?;
-    dtb.write(&payload[dtb_offset..dtb_offset + dtb_size])?;
+    let mut ramdisk = FastbootBuffer::alloc(MemoryType::BOOT_SERVICES_DATA, ramdisk_size)
+        .with_context("failed to allocate memory for ramdisk")?;
+    ramdisk
+        .write(&payload[ramdisk_offset..ramdisk_offset + ramdisk_size])
+        .with_context("failed to write ramdisk payload")?;
+
+    let mut dtb = FastbootBuffer::alloc(MemoryType::ACPI_RECLAIM, dtb_size)
+        .with_context("failed to allocate memory for fdt")?;
+    dtb.write(&payload[dtb_offset..dtb_offset + dtb_size])
+        .with_context("failed to write fdt")?;
 
     let cmdline_len = aboot2
         .cmdline
@@ -83,16 +103,20 @@ pub(crate) fn handle_bootimg(payload: &[u8]) -> Result<(Handle, Option<LinuxInit
     let cmdline = core::str::from_utf8(cmdline).expect("Unable to parse command line");
 
     let mut cmdline_buf =
-        boot::allocate_pool(MemoryType::BOOT_SERVICES_DATA, (cmdline.len() + 1) * 2)?.cast::<u16>();
+        boot::allocate_pool(MemoryType::BOOT_SERVICES_DATA, (cmdline.len() + 1) * 2)
+            .with_context("failed to allocate memory for command line")?
+            .cast::<u16>();
     let cmdline_buf: &mut [u16] =
         unsafe { &mut *slice_from_raw_parts_mut(cmdline_buf.as_mut(), cmdline.len() + 1) };
     CStr16::from_str_with_buf(cmdline, cmdline_buf)
         .expect("Unable to convert command line to UCS-2");
 
-    let handle = kernel.load_image()?;
+    let handle = kernel.load_image().expect("failed to load the kernel");
 
-    dtb.install_configuration_table(&EFI_FDT_TABLE)?;
-    let mut loaded_image = boot::open_protocol_exclusive::<LoadedImage>(handle)?;
+    dtb.install_configuration_table(&EFI_FDT_TABLE)
+        .with_context("failed to install fdt in configuration table")?;
+    let mut loaded_image = boot::open_protocol_exclusive::<LoadedImage>(handle)
+        .with_context("failed to load image")?;
     unsafe {
         loaded_image.set_load_options(
             cmdline_buf.as_ptr() as *const u8,
