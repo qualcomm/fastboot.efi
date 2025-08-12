@@ -70,14 +70,15 @@ fn fastboot_respond(usb_device: &ScopedProtocol<EfiUsbDevice>, response: &str) -
         .expect("failed to allocate command buffer");
 
     let mut payload = response.as_bytes().to_vec();
+    let payload_len = payload.len().min(64);
     payload.push(0);
 
     unsafe {
-        ptr::copy_nonoverlapping(payload.as_ptr(), buf, payload.len());
+        ptr::copy_nonoverlapping(payload.as_ptr(), buf, payload_len);
     }
 
     usb_device
-        .send(usb_device::ENDPOINT_IN, payload.len(), buf)
+        .send(usb_device::ENDPOINT_IN, payload_len, buf)
         .expect("failed to send response");
 
     Ok(())
