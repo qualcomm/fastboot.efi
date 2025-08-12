@@ -267,7 +267,8 @@ fn generate_serial_number() -> Result<CString16> {
 fn main() -> Status {
     uefi::helpers::init().unwrap();
 
-    let serial_number = generate_serial_number().unwrap();
+    let serial_number =
+        generate_serial_number().unwrap_or(CString16::try_from("deadcafe").unwrap());
 
     signal_usb_controller_init().expect("failed to signal usb controller initialization");
 
