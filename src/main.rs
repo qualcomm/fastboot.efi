@@ -267,6 +267,9 @@ fn generate_serial_number() -> Result<CString16> {
 fn main() -> Status {
     uefi::helpers::init().unwrap();
 
+    let version = env!("BUILD_VERSION");
+    info!("fastboot.efi {}", version);
+
     let serial_number = generate_serial_number().unwrap();
 
     signal_usb_controller_init().expect("failed to signal usb controller initialization");
