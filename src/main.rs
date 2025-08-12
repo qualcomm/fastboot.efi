@@ -37,6 +37,16 @@ const EFI_RT_PROPERTIES_TABLE: Guid = guid!("eb66918a-7eef-402a-842e-931d21c38ae
 const EFI_FDT_TABLE: Guid = guid!("b1b621d5-f19c-41a5-830b-d9152c69aae0");
 const LINUX_EFI_INITRD_MEDIA_GUID: Guid = guid!("5568e427-68fc-4f3d-ac74-ca555231cc68");
 
+trait UefiResultContext<T> {
+    fn with_context(self, msg: &'static str) -> Result<T, &'static str>;
+}
+
+impl<T> UefiResultContext<T> for Result<T, ()> {
+    fn with_context(self, msg: &'static str) -> Result<T, &'static str> {
+        self.map_err(|e| uefi::Error::new(e.status(), msg))
+    }
+}
+
 extern "efiapi" fn dummy_callback(_: Event, _: Option<NonNull<c_void>>) {}
 
 fn signal_usb_controller_init() -> Result {
@@ -231,7 +241,12 @@ fn handle_boot(usb_device: &ScopedProtocol<EfiUsbDevice>, payload: &[u8]) -> Res
     let (handle, _initrd) = if is_peimage(payload) {
         (handle_peimage(payload)?, None)
     } else if is_bootimg(payload) {
-        handle_bootimg(payload)?
+        let result = handle_bootimg(payload);
+        if let Err(err) = result {
+            fastboot_respond(usb_device, &format!("FAILfailed: {}", err.data()))?;
+            return Ok(());
+        }
+        result.unwrap()
     } else {
         fastboot_respond(usb_device, "FAIL")?;
         return Err(uefi::Error::new(Status::INVALID_PARAMETER, ()));
