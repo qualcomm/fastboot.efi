@@ -244,6 +244,23 @@ fn handle_boot(usb_device: &ScopedProtocol<EfiUsbDevice>, payload: &[u8]) -> Res
     Ok(())
 }
 
+fn handle_getvar(usb_device: &ScopedProtocol<EfiUsbDevice>, variable: &str) -> Result {
+    let response = match variable {
+        "version" => Some("0.4"),
+        "version-bootloader" => Some(env!("BUILD_VERSION")),
+        _ => None,
+    };
+
+    let response = match response {
+        Some(response) => format!("OKAY{}", response),
+        None => format!("FAILunknown variable: {}", variable),
+    };
+
+    fastboot_respond(usb_device, &response).expect("Failed to send response");
+
+    Ok(())
+}
+
 fn generate_serial_number() -> Result<CString16> {
     let handle = boot::get_handle_for_protocol::<MemCardInfo>()?;
     let memcardinfo = boot::open_protocol_exclusive::<MemCardInfo>(handle)?;
@@ -320,6 +337,14 @@ fn main() -> Status {
                     let _ = fastboot_respond(&usb_device, "OKAY");
 
                     break 'message_loop;
+                } else if request.starts_with("getvar") {
+                    let Some(variable) = request.split(':').nth(1) else {
+                        fastboot_respond(&usb_device, "FAILinvalid getvar")
+                            .expect("Failed to send response");
+                        continue;
+                    };
+
+                    handle_getvar(&usb_device, variable).expect("Failed to handle getvar command");
                 } else {
                     fastboot_respond(&usb_device, "FAILunknown command")
                         .expect("Failed to send response");
