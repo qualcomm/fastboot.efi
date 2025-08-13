@@ -20,6 +20,24 @@ use crate::peimage::is_peimage;
 const BOOT_MAGIC: &[u8; 8] = b"ANDROID!";
 
 #[repr(C, packed)]
+struct AndroidBootImageV0 {
+    magic: [u8; 8],
+    kernel_size: u32,
+    kernel_addr: u32,
+    ramdisk_size: u32,
+    ramdisk_addr: u32,
+    second_size: u32,
+    second_addr: u32,
+    tags_addr: u32,
+    page_size: u32,
+    header_version: u32, /* reserved... */
+    reserved: u32,
+    name: [u8; 16],
+    cmdline: [u8; 512],
+    id: [u32; 8],
+}
+
+#[repr(C, packed)]
 struct AndroidBootImageV2 {
     magic: [u8; 8],
     kernel_size: u32,
@@ -43,8 +61,22 @@ struct AndroidBootImageV2 {
     dtb_addr: u64,
 }
 
-pub(crate) fn is_bootimg(payload: &[u8]) -> bool {
-    payload.starts_with(BOOT_MAGIC)
+pub(crate) fn is_bootimg_v0(payload: &[u8]) -> bool {
+    if !payload.starts_with(BOOT_MAGIC) {
+        return false;
+    }
+
+    let aboot: &AndroidBootImageV0 = unsafe { &*(payload.as_ptr().cast()) };
+    aboot.header_version == 0
+}
+
+pub(crate) fn is_bootimg_v2(payload: &[u8]) -> bool {
+    if !payload.starts_with(BOOT_MAGIC) {
+        return false;
+    }
+
+    let aboot2: &AndroidBootImageV2 = unsafe { &*(payload.as_ptr().cast()) };
+    aboot2.header_version == 2
 }
 
 fn is_gzip(payload: &[u8]) -> bool {
@@ -101,7 +133,53 @@ fn gzip_decompress(payload: &[u8], output: &mut [u8]) -> Result<(), &'static str
     }
 }
 
-pub(crate) fn handle_bootimg(
+pub(crate) fn handle_bootimg_v0(payload: &[u8]) -> Result<Handle, &'static str> {
+    let aboot: &AndroidBootImageV0 = unsafe { &*(payload.as_ptr().cast()) };
+
+    if aboot.header_version != 0 {
+        return Err(Error::new(
+            Status::INVALID_PARAMETER,
+            "only version 0 supported",
+        ));
+    }
+
+    let page_align = |offset: usize| {
+        let mask = (aboot.page_size - 1) as usize;
+        (offset + (mask)) & !(mask)
+    };
+
+    let header_size = core::mem::size_of::<AndroidBootImageV0>();
+    let kernel_offset = page_align(header_size);
+    let kernel_size = aboot.kernel_size as usize;
+    let ramdisk_size = aboot.ramdisk_size as usize;
+    let second_size = aboot.second_size as usize;
+
+    if ramdisk_size != 0 || second_size != 0 {
+        return Err(Error::new(
+            Status::INVALID_PARAMETER,
+            "use header version 2",
+        ));
+    }
+
+    let mut kernel = FastbootBuffer::alloc(MemoryType::RUNTIME_SERVICES_CODE, kernel_size)
+        .with_context("failed to allocate memory for kernel")?;
+    kernel
+        .write(&payload[kernel_offset..kernel_offset + kernel_size])
+        .with_context("failed to write kernel payload")?;
+
+    if !is_peimage(kernel.as_slice()) {
+        return Err(Error::new(
+            Status::INVALID_PARAMETER,
+            "kernel payload is not an EFI application",
+        ));
+    }
+
+    kernel
+        .load_image()
+        .with_context("failed to load kernel image")
+}
+
+pub(crate) fn handle_bootimg_v2(
     payload: &[u8],
 ) -> Result<(Handle, Option<LinuxInitrd>), &'static str> {
     let aboot2: &AndroidBootImageV2 = unsafe { &*(payload.as_ptr().cast()) };
