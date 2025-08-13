@@ -18,7 +18,7 @@ use uefi::{guid, prelude::*, CStr16, CString16, Error, Guid, Result};
 use memcardinfo::MemCardInfo;
 
 mod abootimg;
-use abootimg::{handle_bootimg, is_bootimg};
+use abootimg::{handle_bootimg_v0, handle_bootimg_v2, is_bootimg_v0, is_bootimg_v2};
 
 mod initrd;
 mod memcardinfo;
@@ -248,8 +248,15 @@ fn create_empty_rt_properties_table() -> Result<FastbootBuffer> {
 fn handle_boot(usb_device: &ScopedProtocol<EfiUsbDevice>, payload: &[u8]) -> Result {
     let (handle, _initrd) = if is_peimage(payload) {
         (handle_peimage(payload)?, None)
-    } else if is_bootimg(payload) {
-        let result = handle_bootimg(payload);
+    } else if is_bootimg_v0(payload) {
+        let result = handle_bootimg_v0(payload);
+        if let Err(err) = result {
+            fastboot_respond(usb_device, &format!("FAILfailed: {}", err.data()))?;
+            return Ok(());
+        }
+        (result.unwrap(), None)
+    } else if is_bootimg_v2(payload) {
+        let result = handle_bootimg_v2(payload);
         if let Err(err) = result {
             fastboot_respond(usb_device, &format!("FAILfailed: {}", err.data()))?;
             return Ok(());
