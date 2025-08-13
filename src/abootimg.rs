@@ -50,6 +50,13 @@ pub(crate) fn handle_bootimg(
 ) -> Result<(Handle, Option<LinuxInitrd>), &'static str> {
     let aboot2: &AndroidBootImageV2 = unsafe { &*(payload.as_ptr().cast()) };
 
+    if aboot2.header_version != 2 {
+        return Err(Error::new(
+            Status::INVALID_PARAMETER,
+            "only version 2 supported",
+        ));
+    }
+
     let page_align = |offset: usize| {
         let mask = (aboot2.page_size - 1) as usize;
         (offset + (mask)) & !(mask)
