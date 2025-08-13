@@ -7,6 +7,7 @@ publish = false
 [dependencies]
 ffi = "0.1.1"
 log = "0.4"
+miniz_oxide = "0.8.9"
 uefi = { version = "0.35", features = ["alloc", "global_allocator", "logger", "panic_handler"] }
 uefi-raw = "0.11.0"
 uguid = "2.2.0"

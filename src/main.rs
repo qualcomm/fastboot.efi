@@ -205,6 +205,14 @@ impl FastbootBuffer {
 
         Ok(handle)
     }
+
+    fn as_slice(&self) -> &[u8] {
+        unsafe { slice::from_raw_parts(self.ptr.as_ref(), self.len) }
+    }
+
+    fn as_mut_slice(&mut self) -> &mut [u8] {
+        unsafe { slice::from_raw_parts_mut(self.ptr.as_ptr(), self.len) }
+    }
 }
 
 #[repr(C)]
