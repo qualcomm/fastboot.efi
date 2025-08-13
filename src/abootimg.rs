@@ -3,6 +3,8 @@
 
 use core::ptr::slice_from_raw_parts_mut;
 use log::info;
+use miniz_oxide::inflate::core::{decompress, DecompressorOxide};
+use miniz_oxide::inflate::TINFLStatus;
 use uefi::boot::{self, MemoryType};
 use uefi::proto::loaded_image::LoadedImage;
 use uefi::{CStr16, Error, Handle, Result, Status};
@@ -45,6 +47,60 @@ pub(crate) fn is_bootimg(payload: &[u8]) -> bool {
     payload.starts_with(BOOT_MAGIC)
 }
 
+fn is_gzip(payload: &[u8]) -> bool {
+    payload.len() > 2 && payload[0] == 0x1f && payload[1] == 0x8b
+}
+
+fn gzip_deflate_slice(data: &[u8]) -> Option<&[u8]> {
+    if data.len() < 10 || data[0] != 0x1F || data[1] != 0x8B || data[2] != 0x08 {
+        return None;
+    }
+
+    let flags = data[3];
+    let mut offset = 10;
+
+    if flags & 0x04 != 0 {
+        let xlen = u16::from_le_bytes([data[offset], data[offset + 1]]) as usize;
+        offset += 2 + xlen;
+    }
+    if flags & 0x08 != 0 {
+        while offset < data.len() && data[offset] != 0 {
+            offset += 1;
+        }
+        offset += 1;
+    }
+    if flags & 0x10 != 0 {
+        while offset < data.len() && data[offset] != 0 {
+            offset += 1;
+        }
+        offset += 1;
+    }
+    if flags & 0x02 != 0 {
+        offset += 2;
+    }
+
+    if offset >= data.len() {
+        return None;
+    }
+
+    Some(&data[offset..data.len() - 8])
+}
+
+fn gzip_decompress(payload: &[u8], output: &mut [u8]) -> Result<(), &'static str> {
+    let deflate_data = gzip_deflate_slice(payload).unwrap();
+    let mut decomp = DecompressorOxide::new();
+
+    let (status, _, _) = decompress(&mut decomp, deflate_data, output, 0, 0);
+
+    match status {
+        TINFLStatus::Done => Ok(()),
+        _ => Err(Error::new(
+            Status::LOAD_ERROR,
+            "failed to decompress kernel",
+        )),
+    }
+}
+
 pub(crate) fn handle_bootimg(
     payload: &[u8],
 ) -> Result<(Handle, Option<LinuxInitrd>), &'static str> {
@@ -77,18 +133,32 @@ pub(crate) fn handle_bootimg(
         kernel_size, kernel_offset, ramdisk_size, ramdisk_offset, dtb_size, dtb_offset
     );
 
-    if !is_peimage(&payload[ramdisk_offset..ramdisk_offset + ramdisk_size]) {
+    let kernel = if is_gzip(&payload[kernel_offset..kernel_offset + kernel_size]) {
+        let mut kernel =
+            FastbootBuffer::alloc(MemoryType::RUNTIME_SERVICES_CODE, 128 * 1024 * 1024)
+                .with_context("failed to allocate memory for kernel")?;
+
+        gzip_decompress(
+            &payload[kernel_offset..kernel_offset + kernel_size],
+            kernel.as_mut_slice(),
+        )?;
+
+        kernel
+    } else {
+        let mut kernel = FastbootBuffer::alloc(MemoryType::RUNTIME_SERVICES_CODE, kernel_size)
+            .with_context("failed to allocate memory for kernel")?;
+        kernel
+            .write(&payload[kernel_offset..kernel_offset + kernel_size])
+            .with_context("failed to write kernel payload")?;
+        kernel
+    };
+
+    if !is_peimage(kernel.as_slice()) {
         return Err(Error::new(
             Status::INVALID_PARAMETER,
             "kernel payload is not an EFI application",
         ));
     }
-
-    let mut kernel = FastbootBuffer::alloc(MemoryType::RUNTIME_SERVICES_CODE, kernel_size)
-        .with_context("failed to allocate memory for kernel")?;
-    kernel
-        .write(&payload[kernel_offset..kernel_offset + kernel_size])
-        .with_context("failed to write kernel payload")?;
 
     let mut ramdisk = FastbootBuffer::alloc(MemoryType::BOOT_SERVICES_DATA, ramdisk_size)
         .with_context("failed to allocate memory for ramdisk")?;
