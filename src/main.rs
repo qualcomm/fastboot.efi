@@ -283,8 +283,8 @@ fn handle_getvar(usb_device: &ScopedProtocol<EfiUsbDevice>, variable: &str) -> R
     };
 
     let response = match response {
-        Some(response) => format!("OKAY{}", response),
-        None => format!("FAILunknown variable: {}", variable),
+        Some(response) => format!("OKAY{response}"),
+        None => format!("FAILunknown variable: {variable}"),
     };
 
     fastboot_respond(usb_device, &response).expect("Failed to send response");
