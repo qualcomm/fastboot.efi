@@ -1,0 +1,32 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUSTFLAGS: "-Dwarnings"
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get the required dependencies
+        run: sudo apt install -y mtools
+
+      - name: Build the project
+        run: cargo build --target aarch64-unknown-uefi
+
+      - name: Package the images
+        run: ./build-img.sh
+
+      - name: Upload the artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: EFIESP
+          path: out/*

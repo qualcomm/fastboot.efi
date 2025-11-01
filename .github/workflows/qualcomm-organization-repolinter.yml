@@ -2,9 +2,9 @@ name: Qualcomm Organization Repolinter
 
 on:
   push:
-    branches: [ "main" ]
+    branches: ["main"]
   pull_request:
-    branches: [ "main" ]
+    branches: ["main"]
   workflow_dispatch:
 
 jobs:
@@ -28,4 +28,3 @@ jobs:
         uses: todogroup/repolinter-action@v1
         with:
           config_url: "https://raw.githubusercontent.com/qualcomm/.github/main/repolint.json"
-
