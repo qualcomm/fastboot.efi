@@ -244,10 +244,14 @@ pub(crate) fn handle_bootimg_v2(
         .write(&payload[ramdisk_offset..ramdisk_offset + ramdisk_size])
         .with_context("failed to write ramdisk payload")?;
 
-    let mut dtb = FastbootBuffer::alloc(MemoryType::ACPI_RECLAIM, dtb_size)
-        .with_context("failed to allocate memory for fdt")?;
-    dtb.write(&payload[dtb_offset..dtb_offset + dtb_size])
-        .with_context("failed to write fdt")?;
+    if dtb_size != 0 {
+        let mut dtb = FastbootBuffer::alloc(MemoryType::ACPI_RECLAIM, dtb_size)
+            .with_context("failed to allocate memory for fdt")?;
+        dtb.write(&payload[dtb_offset..dtb_offset + dtb_size])
+            .with_context("failed to write fdt")?;
+        dtb.install_configuration_table(&EFI_FDT_TABLE)
+            .with_context("failed to install fdt in configuration table")?;
+    }
 
     let cmdline_len = aboot2
         .cmdline
@@ -268,8 +272,6 @@ pub(crate) fn handle_bootimg_v2(
 
     let handle = kernel.load_image().expect("failed to load the kernel");
 
-    dtb.install_configuration_table(&EFI_FDT_TABLE)
-        .with_context("failed to install fdt in configuration table")?;
     let mut loaded_image = boot::open_protocol_exclusive::<LoadedImage>(handle)
         .with_context("failed to load image")?;
     unsafe {
