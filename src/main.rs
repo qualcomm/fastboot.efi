@@ -8,10 +8,13 @@ extern crate alloc;
 
 use alloc::{format, slice};
 use core::ffi::c_void;
+use core::mem::{size_of, MaybeUninit};
 use core::ptr::{self, NonNull};
 use log::info;
 use uefi::boot::{EventType, MemoryType, ScopedProtocol, Tpl};
 use uefi::data_types::Event;
+use uefi::proto::device_path::build::{self, DevicePathBuilder};
+use uefi::proto::device_path::{end, hardware};
 use uefi::runtime::ResetType;
 use uefi::{guid, prelude::*, CStr16, CString16, Error, Guid, Result};
 
@@ -197,9 +200,26 @@ impl FastbootBuffer {
     }
 
     fn load_image(&self) -> Result<Handle> {
+        let start_address = self.ptr.as_ptr() as u64;
+        let end_address = start_address
+            .checked_add(self.len as u64)
+            .and_then(|end| end.checked_sub(1))
+            .ok_or(Error::new(Status::INVALID_PARAMETER, ()))?;
+        let mut path_buf =
+            [MaybeUninit::uninit(); size_of::<hardware::MemoryMapped>() + size_of::<end::Entire>()];
+        let path = DevicePathBuilder::with_buf(&mut path_buf)
+            .push(&build::hardware::MemoryMapped {
+                memory_type: MemoryType::LOADER_DATA,
+                start_address,
+                end_address,
+            })
+            .map_err(|_| Error::new(Status::OUT_OF_RESOURCES, ()))?
+            .finalize()
+            .map_err(|_| Error::new(Status::OUT_OF_RESOURCES, ()))?;
+
         let source = boot::LoadImageSource::FromBuffer {
             buffer: unsafe { slice::from_raw_parts(self.ptr.as_ref(), self.len) },
-            file_path: None,
+            file_path: Some(path),
         };
         let handle = boot::load_image(boot::image_handle(), source)?;
 
