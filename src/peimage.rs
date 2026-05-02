@@ -11,30 +11,43 @@ const PE_ARM64: u16 = 0xaa64;
 const PE_PLUS: u16 = 0x020b;
 const PE_SUBSYSTEM_EFI_APP: u16 = 10;
 
-pub(crate) fn is_peimage(payload: &[u8]) -> bool {
+pub(crate) fn expected_pe_machine() -> u16 {
+    PE_ARM64
+}
+
+pub(crate) fn pe_machine(payload: &[u8]) -> Option<u16> {
     if payload.len() < PE_OFFSET + 4 || payload[0] != b'M' || payload[1] != b'Z' {
+        return None;
+    }
+
+    let pe_offset = payload.get(PE_OFFSET..PE_OFFSET + 4)?;
+    let pe_offset = u32::from_le_bytes(pe_offset.try_into().ok()?) as usize;
+
+    if payload.get(pe_offset..pe_offset + PE_MAGIC.len())? != PE_MAGIC {
+        return None;
+    }
+
+    let coff_hdr = payload.get(pe_offset + PE_MAGIC.len()..)?;
+    let machine = coff_hdr.get(0..2)?;
+    Some(u16::from_le_bytes(machine.try_into().ok()?))
+}
+
+pub(crate) fn is_peimage(payload: &[u8]) -> bool {
+    let machine = match pe_machine(payload) {
+        Some(machine) => machine,
+        None => return false,
+    };
+    if machine != PE_ARM64 {
         return false;
     }
 
     let pe_offset: [u8; 4] = payload[PE_OFFSET..PE_OFFSET + 4].try_into().unwrap();
     let pe_offset = u32::from_le_bytes(pe_offset) as usize;
-
-    if payload.len() < pe_offset + PE_MAGIC.len() + 70
-        || payload[pe_offset..pe_offset + PE_MAGIC.len()] != PE_MAGIC
-    {
-        return false;
-    }
-    if payload[pe_offset..pe_offset + PE_MAGIC.len()] != PE_MAGIC {
+    if payload.len() < pe_offset + PE_MAGIC.len() + 70 {
         return false;
     }
 
     let coff_hdr = &payload[pe_offset + PE_MAGIC.len()..];
-    let machine: [u8; 2] = coff_hdr[0..2].try_into().unwrap();
-    let machine = u16::from_le_bytes(machine);
-
-    if machine != PE_ARM64 {
-        return false;
-    }
 
     let opt_hdr_size: [u8; 2] = coff_hdr[16..18].try_into().unwrap();
     let opt_hdr_size = u16::from_le_bytes(opt_hdr_size);
