@@ -53,11 +53,7 @@ pub(crate) fn is_peimage(payload: &[u8]) -> bool {
     let subsystem: [u8; 2] = opt_hdr[68..70].try_into().unwrap();
     let subsystem = u16::from_le_bytes(subsystem);
 
-    if subsystem != PE_SUBSYSTEM_EFI_APP {
-        return false;
-    }
-
-    true
+    subsystem == PE_SUBSYSTEM_EFI_APP
 }
 
 pub(crate) fn handle_peimage(payload: &[u8]) -> Result<Handle> {
