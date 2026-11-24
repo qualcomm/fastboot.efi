@@ -317,7 +317,7 @@ fn generate_serial_number() -> Result<CString16> {
     let memcardinfo = boot::open_protocol_exclusive::<MemCardInfo>(handle)?;
     let cardinfo = memcardinfo.get_card_info()?;
 
-    let serial = if cardinfo.card_type[0..3] == [b'U', b'F', b'S'] {
+    let serial = if cardinfo.card_type[0..3] == *b"UFS" {
         let serial_number_len = cardinfo.serial_number_len as usize;
         boot::calculate_crc32(&cardinfo.serial_number[..serial_number_len])?
     } else {
